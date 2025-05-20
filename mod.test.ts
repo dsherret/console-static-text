@@ -1,0 +1,144 @@
+import { RenderInterval, StaticTextContainer } from "./mod.ts";
+import { assertEquals } from "@std/assert";
+
+function createVtsReplacements() {
+  function vtsMoveUp(count: number) {
+    if (count === 0) {
+      throw new Error("Invalid.");
+    }
+    return `\x1B[${count}A`;
+  }
+
+  function vtsMoveDown(count: number) {
+    if (count === 0) {
+      throw new Error("Invalid.");
+    }
+    return `\x1B[${count}B`;
+  }
+
+  const vtsMoveToZeroCol = "\x1B[0G";
+  const vtsClearCursorDown = "\x1B[2K\x1B[J";
+  const vtsClearUntilNewline = "\x1B[K";
+
+  const mappings: [string, string][] = [];
+  for (let i = 1; i < 10; i++) {
+    mappings.push([`~CUP${i}~`, vtsMoveUp(i)]);
+    mappings.push([`~CDOWN${i}~`, vtsMoveDown(i)]);
+  }
+  mappings.push(["~CLEAR_CDOWN~", vtsClearCursorDown]);
+  mappings.push(["~CLEAR_UNTIL_NEWLINE~", vtsClearUntilNewline]);
+  mappings.push(["~MOVE0~", vtsMoveToZeroCol]);
+  return mappings;
+}
+
+const replacements = createVtsReplacements();
+
+function vtsReplace(text: string) {
+  for (const replacement of replacements) {
+    text = text.replaceAll(replacement[1], replacement[0]);
+  }
+  return text;
+}
+
+Deno.test("should set items", () => {
+  let writtenText: string = "";
+  const assertText = (text: string) => {
+    assertEquals(vtsReplace(writtenText), text);
+    writtenText = "";
+  };
+
+  const container = new StaticTextContainer(
+    (text) => {
+      writtenText += text;
+    },
+    () => ({ rows: 10, columns: 10 }),
+  );
+  const scope = container.createScope();
+  scope.setText("Hello there this is a test");
+  container.refresh();
+  assertText("~MOVE0~~CLEAR_CDOWN~Hello\r\nthere this\r\nis a test~MOVE0~");
+  scope.setText([{
+    text: "something else",
+    indent: 1,
+  }]);
+  container.refresh();
+  assertText(
+    "~MOVE0~~CUP2~something\r\n else~CLEAR_UNTIL_NEWLINE~~CDOWN1~~CLEAR_CDOWN~~CUP1~~MOVE0~",
+  );
+
+  const newScope = container.createScope();
+  newScope.setText([{ text: "hello" }]);
+  container.refresh();
+  assertText("~MOVE0~~CUP1~something\r\n else\r\nhello~MOVE0~");
+
+  newScope.logAbove("log");
+  container.refresh();
+  assertText(
+    "~MOVE0~~CUP2~~CLEAR_CDOWN~~MOVE0~~CLEAR_CDOWN~log~MOVE0~\r\n~MOVE0~something\r\n else\r\nhello~MOVE0~",
+  );
+  container.clear();
+  assertText("~MOVE0~~CUP2~~CLEAR_CDOWN~");
+  newScope[Symbol.dispose]();
+  container.refresh();
+  assertText("~MOVE0~something\r\n else~MOVE0~");
+});
+
+Deno.test("render interval", async () => {
+  let writtenText: string = "";
+  const assertText = (text: string) => {
+    assertEquals(vtsReplace(writtenText), text);
+    writtenText = "";
+  };
+
+  const container = new StaticTextContainer(
+    (text) => {
+      writtenText += text;
+    },
+    () => ({ rows: 10, columns: 10 }),
+  );
+  const interval = new RenderInterval(container);
+  interval.intervalMs = 5;
+  using stop = interval.start();
+
+  const scope = container.createScope();
+
+  scope.setText("1");
+  await sleep(10);
+  assertText("~MOVE0~~CLEAR_CDOWN~1~MOVE0~");
+  scope.setText("hello");
+  assertText("");
+  await sleep(10);
+  assertText("~MOVE0~hello~MOVE0~");
+  stop[Symbol.dispose]();
+  scope.setText("no more updates because disposed");
+  await sleep(10);
+  assertText("");
+});
+
+Deno.test("render interval refreshes on disposal", () => {
+  let writtenText: string = "";
+  const assertText = (text: string) => {
+    assertEquals(vtsReplace(writtenText), text);
+    writtenText = "";
+  };
+
+  const container = new StaticTextContainer(
+    (text) => {
+      writtenText += text;
+    },
+    () => ({ rows: 20, columns: 20 }),
+  );
+  const renderInterval = new RenderInterval(container);
+  {
+    using _renderScope = renderInterval.start(); // updates the displayed text periodically
+    using scope = container.createScope(); // make sure this is second
+    scope.setText(`Downloading...`);
+    container.refresh();
+    assertText("~MOVE0~~CLEAR_CDOWN~Downloading...~MOVE0~");
+  }
+  assertText("~MOVE0~~CLEAR_UNTIL_NEWLINE~~MOVE0~");
+});
+
+function sleep(ms: number) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
