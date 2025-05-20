@@ -1,6 +1,5 @@
 {
   "name": "@david/console-static-text",
-  "version": "0.1.0",
   "exports": "./mod.ts",
   "tasks": {
     "build": "deno run -A jsr:@deno/wasmbuild@0.19.2 --inline --out ./lib"
