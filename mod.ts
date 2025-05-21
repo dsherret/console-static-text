@@ -4,11 +4,13 @@ import {
   strip_ansi_codes,
 } from "./lib/rs_lib.js";
 
+/** Text item to display. */
 export type TextItem = string | DeferredItem | DetailedTextItem;
 
-/** Text that's rendered at compile time. */
+/** Function called on each render. */
 export type DeferredItem = (size: ConsoleSize) => TextItem | TextItem[];
 
+/** Item that also supports hanging indentation. */
 export interface DetailedTextItem {
   text: string | DeferredItem;
   hangingIndent?: number;
@@ -19,8 +21,11 @@ interface WasmTextItem {
   hangingIndent?: number;
 }
 
+/** Console size. */
 export interface ConsoleSize {
+  /** Number of horizontal columns. */
   columns: number | undefined;
+  /** Number of vertical rows. */
   rows: number | undefined;
 }
 
