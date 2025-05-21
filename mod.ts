@@ -8,7 +8,7 @@ import {
 export type TextItem = string | DeferredItem | DetailedTextItem;
 
 /** Function called on each render. */
-export type DeferredItem = (size: ConsoleSize) => TextItem | TextItem[];
+export type DeferredItem = (size: ConsoleSize | undefined) => (TextItem | TextItem[]);
 
 /** Item that also supports hanging indentation. */
 export interface DetailedTextItem {
@@ -24,9 +24,9 @@ interface WasmTextItem {
 /** Console size. */
 export interface ConsoleSize {
   /** Number of horizontal columns. */
-  columns: number | undefined;
+  columns: number;
   /** Number of vertical rows. */
-  rows: number | undefined;
+  rows: number;
 }
 
 const scopesSymbol = Symbol();
@@ -97,13 +97,13 @@ export class StaticTextScope implements Disposable {
 export class StaticTextContainer {
   readonly #container = new RustyStaticTextContainer();
   private readonly [scopesSymbol]: StaticTextScope[] = [];
-  readonly #getConsoleSize: () => ConsoleSize;
+  readonly #getConsoleSize: () => (ConsoleSize | undefined);
   readonly #onWriteText: (text: string) => void;
   private readonly [onItemsChangedEventsSymbol]: (() => void)[] = [];
 
   constructor(
     onWriteText: (text: string) => void,
-    getConsoleSize: () => ConsoleSize,
+    getConsoleSize: () => ConsoleSize | undefined,
   ) {
     this.#onWriteText = onWriteText;
     this.#getConsoleSize = getConsoleSize;
@@ -115,12 +115,8 @@ export class StaticTextContainer {
   }
 
   /** Gets the containers current console size. */
-  getConsoleSize(): ConsoleSize {
-    try {
-      return this.#getConsoleSize();
-    } catch {
-      return { columns: undefined, rows: undefined };
-    }
+  getConsoleSize(): ConsoleSize | undefined {
+    return this.#getConsoleSize();
   }
 
   /** Logs the provided text above the static text. */
@@ -177,8 +173,8 @@ export class StaticTextContainer {
    * Note: this is a low level method. Prefer calling `.clear()` instead.
    */
   renderClearText(size?: ConsoleSize): string | undefined {
-    const { columns, rows } = size ?? this.#getConsoleSize();
-    return this.#container.clear_text(columns, rows);
+    size = size ?? this.#getConsoleSize();
+    return this.#container.clear_text(size?.columns, size?.rows);
   }
 
   /**
@@ -189,10 +185,10 @@ export class StaticTextContainer {
   renderRefreshText(size?: ConsoleSize): string | undefined {
     size ??= this.#getConsoleSize();
     const items = Array.from(this.#resolveItems(size));
-    return this.#container.render_text(items, size.columns, size.rows);
+    return this.#container.render_text(items, size?.columns, size?.rows);
   }
 
-  *#resolveItems(size: ConsoleSize): Iterable<WasmTextItem> {
+  *#resolveItems(size: ConsoleSize | undefined): Iterable<WasmTextItem> {
     for (const provider of this[scopesSymbol]) {
       for (const item of provider[getItemsSymbol]()) {
         yield* resolveItem(item, size);
@@ -200,9 +196,8 @@ export class StaticTextContainer {
     }
   }
 
-  private [renderOnceSymbol](items: WasmTextItem[], size: ConsoleSize) {
-    const { columns, rows } = size;
-    const newText = static_text_render_once(items, columns, rows);
+  private [renderOnceSymbol](items: WasmTextItem[], size: ConsoleSize | undefined) {
+    const newText = static_text_render_once(items, size?.columns, size?.rows);
     if (newText != null) {
       this.#onWriteText(newText + "\r\n");
     }
@@ -210,21 +205,6 @@ export class StaticTextContainer {
 }
 
 const encoder = new TextEncoder();
-
-/**
- * Global `StaticTextContainer` that can be shared amongst many libraries.
- * This writes the static text to stderr and gets the real console size.
- */
-export const staticText: StaticTextContainer = new StaticTextContainer(
-  (text) => {
-    const bytes = encoder.encode(text);
-    let written = 0;
-    while (written < bytes.length) {
-      written += Deno.stderr.writeSync(bytes.subarray(written));
-    }
-  },
-  () => Deno.consoleSize(),
-);
 
 export interface RenderIntervalScope extends Disposable {
 }
@@ -366,7 +346,38 @@ export class RenderInterval implements Disposable {
   }
 }
 
+/**
+ * Global `StaticTextContainer` that can be shared amongst many libraries.
+ * This writes the static text to stderr and gets the real console size.
+ */
+export const staticText: StaticTextContainer = new StaticTextContainer(
+  (text) => {
+    const bytes = encoder.encode(text);
+    let written = 0;
+    while (written < bytes.length) {
+      written += Deno.stderr.writeSync(bytes.subarray(written));
+    }
+  },
+  () => consoleSize(),
+);
+
 export const renderInterval: RenderInterval = new RenderInterval(staticText);
+
+/** Renders the text items to a string using no knowledge of a `StaticTextContainer`. */
+export function renderTextItems(items: TextItem[], size?: ConsoleSize) {
+  size ??= consoleSize();
+  const wasmItems = Array.from(resolveItems(items, size));
+  return static_text_render_once(wasmItems, size?.columns, size?.rows) ?? "";
+}
+
+/** Helper to get the console size and return undefined if it's not available. */
+export function consoleSize(): ConsoleSize | undefined {
+  try {
+    return Deno.consoleSize();
+  } catch {
+    return undefined;
+  }
+}
 
 /** Convenience function for stripping ANSI codes.
  * Exposed because it's used in the rust crate. */
@@ -376,7 +387,7 @@ export function stripAnsiCodes(text: string): string {
 
 function* resolveDeferred(
   deferred: DeferredItem,
-  size: ConsoleSize,
+  size: ConsoleSize | undefined,
 ): Iterable<WasmTextItem> {
   const value = deferred(size);
   if (value instanceof Array) {
@@ -388,7 +399,7 @@ function* resolveDeferred(
 
 function* resolveItems(
   value: TextItem[],
-  size: ConsoleSize,
+  size: ConsoleSize | undefined,
 ): Iterable<WasmTextItem> {
   for (const item of value) {
     yield* resolveItem(item, size);
@@ -397,7 +408,7 @@ function* resolveItems(
 
 function* resolveItem(
   item: TextItem,
-  size: ConsoleSize,
+  size: ConsoleSize | undefined,
 ): Iterable<WasmTextItem> {
   if (typeof item === "string") {
     if (item.length > 0) {
