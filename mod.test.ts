@@ -1,5 +1,6 @@
 import { RenderInterval, StaticTextContainer } from "./mod.ts";
 import { assertEquals } from "@std/assert";
+import { delay } from "@std/async/delay";
 
 function createVtsReplacements() {
   function vtsMoveUp(count: number) {
@@ -72,7 +73,6 @@ Deno.test("should set items", () => {
   assertText("~MOVE0~~CUP1~something\r\n else\r\nhello~MOVE0~");
 
   newScope.logAbove("log");
-  container.refresh();
   assertText(
     "~MOVE0~~CUP2~~CLEAR_CDOWN~~MOVE0~~CLEAR_CDOWN~log~MOVE0~\r\n~MOVE0~something\r\n else\r\nhello~MOVE0~",
   );
@@ -103,15 +103,15 @@ Deno.test("render interval", async () => {
   const scope = container.createScope();
 
   scope.setText("1");
-  await sleep(10);
+  await delay(10);
   assertText("~MOVE0~~CLEAR_CDOWN~1~MOVE0~");
   scope.setText("hello");
   assertText("");
-  await sleep(10);
+  await delay(10);
   assertText("~MOVE0~hello~MOVE0~");
   stop[Symbol.dispose]();
   scope.setText("no more updates because disposed");
-  await sleep(10);
+  await delay(10);
   assertText("");
 });
 
@@ -128,7 +128,7 @@ Deno.test("render interval refreshes on disposal", () => {
     },
     () => ({ rows: 20, columns: 20 }),
   );
-  const renderInterval = new RenderInterval(container);
+  using renderInterval = new RenderInterval(container);
   {
     using _renderScope = renderInterval.start(); // updates the displayed text periodically
     using scope = container.createScope(); // make sure this is second
@@ -139,6 +139,32 @@ Deno.test("render interval refreshes on disposal", () => {
   assertText("~MOVE0~~CLEAR_UNTIL_NEWLINE~~MOVE0~");
 });
 
-function sleep(ms: number) {
-  return new Promise((resolve) => setTimeout(resolve, ms));
-}
+Deno.test("deferred rendering", () => {
+  let writtenText: string = "";
+  const assertText = (text: string) => {
+    assertEquals(vtsReplace(writtenText), text);
+    writtenText = "";
+  };
+
+  const container = new StaticTextContainer(
+    (text) => {
+      writtenText += text;
+    },
+    () => ({ rows: 20, columns: 20 }),
+  );
+  using scope = container.createScope();
+  let i = 0;
+  scope.setText(() => (i++).toString());
+  scope.refresh();
+  assertText("~MOVE0~~CLEAR_CDOWN~0~MOVE0~");
+  scope.refresh();
+  assertText("~MOVE0~1~MOVE0~");
+  let j = 0;
+  scope.setText([{
+    text: () => `New: ${j++}`,
+  }]);
+  scope.refresh();
+  assertText("~MOVE0~New: 0~MOVE0~");
+  scope.refresh();
+  assertText("~MOVE0~New: 1~MOVE0~");
+});

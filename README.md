@@ -15,18 +15,23 @@ use might be for displaying progress bars or rendering selections.
 
 <video alt="Video showing a bunch of progress bars outputting while the user is making selections." autoplay muted loop playsinline src="videos/example_output.mp4"></video>
 
-## Example Use
+## Example
 
 ```ts
 import { staticText } from "@david/console-static-text";
+import { delay } from "@std/async/delay";
 
 using scope = staticText.createScope();
 
-scope.setText("Some text");
-scope.setText("Some very long text. ".repeat(10));
-
+scope.setText([
+  "Some text",
+  "Some very long text. ".repeat(10),
+  () => `Time is: ${new Date()}`,
+  (consoleSize) => `Console size: ${consoleSize.rows}, ${consoleSize.columns}`,
+]);
 staticText.refresh(); // draw to console window
 
+await delay(1_000);
 scope.logAbove("Hello!"); // this will be logged immediately above the other text
 ```
 
@@ -61,13 +66,17 @@ import { renderInterval, staticText } from "@david/console-static-text";
 import { delay } from "@std/async/delay";
 
 // defaults to 60
-renderInterval.refreshMs = 30;
+renderInterval.intervalMs = 30;
 
 async function download() {
   using _renderScope = renderInterval.start(); // updates the displayed text periodically
-  using scope = staticText.createScope(); // make sure this is second so it's disposed first
+  // make sure these are after so it's disposed before the render scope
+  using timeScope = staticText.createScope();
+  using downloadScope = staticText.createScope();
+  const startTime = Date.now();
+  timeScope.setText(() => `It's been ${Date.now() - startTime}ms`);
   for (let i = 0; i < 100; i++) {
-    scope.setText(`Downloading ${i}/100...`);
+    downloadScope.setText(`Downloading ${i}/100...`);
     await delay(30); // do some async work
   }
 }
