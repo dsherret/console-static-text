@@ -1,7 +1,9 @@
 # `jsr:@david/console-static-text`
 
+[![JSR](https://jsr.io/badges/@david/console-static-text)](https://jsr.io/@david/console-static-text)
+
 For the Rust crate, go to
-[console_static_text](https://github.com/dsherret/console_static_text)
+[console_static_text](https://github.com/dsherret/console_static_text).
 
 Install:
 

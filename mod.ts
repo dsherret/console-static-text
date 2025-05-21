@@ -58,7 +58,11 @@ export class StaticTextScope implements Disposable {
   setText(items: TextItem[]): void;
   setText(textOrItems: TextItem[] | string | DeferredItem): void {
     if (typeof textOrItems === "string") {
-      textOrItems = [{ text: textOrItems }];
+      if (textOrItems.length === 0) {
+        textOrItems = [];
+      } else {
+        textOrItems = [{ text: textOrItems }];
+      }
     } else if (textOrItems instanceof Function) {
       textOrItems = [{ text: textOrItems }];
     }
@@ -122,7 +126,11 @@ export class StaticTextContainer {
     size ??= this.getConsoleSize();
     let detailedItem: WasmTextItem[];
     if (typeof textOrItems === "string") {
-      detailedItem = [{ text: textOrItems }];
+      if (textOrItems.length === 0) {
+        detailedItem = [];
+      } else {
+        detailedItem = [{ text: textOrItems }];
+      }
     } else {
       detailedItem = Array.from(resolveItems(textOrItems, size));
     }
@@ -131,6 +139,7 @@ export class StaticTextContainer {
     }, size);
   }
 
+  /** Clears the displayed text for the provided action. */
   withTempClear(action: () => void, size?: ConsoleSize) {
     size ??= this.getConsoleSize();
     this.clear(size);
@@ -224,20 +233,27 @@ export class RenderInterval implements Disposable {
   #containerSubscription: (() => void) | undefined;
   #disposed = false;
 
+  /**
+   * Constructs a new `RenderInterval` from the provided `StaticTextContainer`.
+   * @param container Container to render every `intervalMs`.
+   */
   constructor(container: StaticTextContainer) {
     this.#container = container;
   }
 
   [Symbol.dispose]() {
-    this.#removeSubscriptionFromContainer();
-    this.#stopInterval();
+    this.#markStop();
     this.#disposed = true;
   }
 
+  /** Gets how often this interval will refresh the output.
+   * @default `60`
+   */
   get intervalMs(): number {
     return this.#intervalMs;
   }
 
+  /** Sets how often this should refresh the output. */
   set intervalMs(value: number) {
     if (this.#intervalMs === value) {
       return;
@@ -288,28 +304,21 @@ export class RenderInterval implements Disposable {
   }
 
   #markStart() {
+    this.#addSubscriptionToContainer();
     if (this.#containerHasItems()) {
-      this.#startInterval();
-    } else {
-      this.#addSubscriptionToContainer();
+      this.#container.refresh();
     }
   }
 
   #markStop() {
-    if (this.#containerHasItems()) {
-      this.#stopInterval();
-    } else {
-      this.#removeSubscriptionFromContainer();
-    }
+    this.#removeSubscriptionFromContainer();
+    this.#stopInterval();
   }
 
   #startInterval() {
+    this.#container.refresh();
     this.#intervalId = setInterval(() => {
       this.#container.refresh();
-      if (!this.#containerHasItems()) {
-        this.#stopInterval();
-        this.#addSubscriptionToContainer();
-      }
     }, this.#intervalMs);
   }
 
@@ -322,11 +331,16 @@ export class RenderInterval implements Disposable {
   }
 
   #addSubscriptionToContainer() {
+    let lastValue = this.#containerHasItems();
     this.#containerSubscription = () => {
-      if (this.#containerHasItems()) {
-        this.#container.refresh();
-        this.#removeSubscriptionFromContainer();
-        this.#startInterval();
+      const hasItems = this.#containerHasItems();
+      if (hasItems != lastValue) {
+        lastValue = hasItems;
+        if (this.#containerHasItems()) {
+          this.#startInterval();
+        } else {
+          this.#stopInterval();
+        }
       }
     };
     this.#container[onItemsChangedEventsSymbol].push(
@@ -381,7 +395,9 @@ function* resolveItem(
   size: ConsoleSize,
 ): Iterable<WasmTextItem> {
   if (typeof item === "string") {
-    yield { text: item };
+    if (item.length > 0) {
+      yield { text: item };
+    }
   } else if (item instanceof Function) {
     yield* resolveDeferred(item, size);
   } else if (item.text instanceof Function) {
@@ -392,7 +408,7 @@ function* resolveItem(
         hangingIndent: hangingIndent + (value.hangingIndent ?? 0),
       };
     }
-  } else {
+  } else if (item.text.length > 0) {
     yield item as WasmTextItem;
   }
 }

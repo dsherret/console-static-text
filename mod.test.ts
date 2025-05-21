@@ -90,7 +90,7 @@ Deno.test("should set items", () => {
   assertText("~MOVE0~~CUP1~First~CLEAR_UNTIL_NEWLINE~\r\nSecond~MOVE0~");
 });
 
-Deno.test("render interval", async () => {
+Deno.test("render interval basic", async () => {
   let writtenText: string = "";
   const assertText = (text: string) => {
     assertEquals(vtsReplace(writtenText), text);
@@ -144,6 +144,33 @@ Deno.test("render interval refreshes on disposal", () => {
     assertText("~MOVE0~~CLEAR_CDOWN~Downloading...~MOVE0~");
   }
   assertText("~MOVE0~~CLEAR_UNTIL_NEWLINE~~MOVE0~");
+});
+
+Deno.test("render interval starts and stops", async () => {
+  let writtenText: string = "";
+  const assertText = (text: string) => {
+    assertEquals(vtsReplace(writtenText), text);
+    writtenText = "";
+  };
+
+  const container = new StaticTextContainer(
+    (text) => {
+      writtenText += text;
+    },
+    () => ({ rows: 20, columns: 20 }),
+  );
+  using renderInterval = new RenderInterval(container);
+  renderInterval.intervalMs = 10;
+  using _renderScope = renderInterval.start(); // updates the displayed text periodically
+  using scope = container.createScope(); // make sure this is second
+  scope.setText(`Downloading...`);
+  await delay(15);
+  assertText("~MOVE0~~CLEAR_CDOWN~Downloading...~MOVE0~");
+  scope.setText("New");
+  assertText("");
+  scope.setText("");
+  scope.setText("New"); // this will cause an immediate render because it was previously cleared
+  assertText("~MOVE0~New~CLEAR_UNTIL_NEWLINE~~MOVE0~");
 });
 
 Deno.test("deferred rendering", () => {
