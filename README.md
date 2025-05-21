@@ -13,7 +13,7 @@ Library for displaying text that should stay at the bottom of the console. This
 measures words to handle wrapping and has some console resizing support. Example
 use might be for displaying progress bars or rendering selections.
 
-<video alt="Video showing a bunch of progress bars outputting while the user is making selections." autoplay muted loop playsinline src="videos/example_output.mp4"></video>
+<video alt="Video showing a bunch of progress bars outputting while the user is making selections." controls muted loop playsinline src="videos/example_output.mp4"></video>
 
 ## Example
 
