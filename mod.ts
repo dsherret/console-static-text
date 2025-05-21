@@ -363,20 +363,20 @@ export const staticText: StaticTextContainer = new StaticTextContainer(
       written += Deno.stderr.writeSync(bytes.subarray(written));
     }
   },
-  () => consoleSize(),
+  () => maybeConsoleSize(),
 );
 
 export const renderInterval: RenderInterval = new RenderInterval(staticText);
 
 /** Renders the text items to a string using no knowledge of a `StaticTextContainer`. */
 export function renderTextItems(items: TextItem[], size?: ConsoleSize): string {
-  size ??= consoleSize();
+  size ??= maybeConsoleSize();
   const wasmItems = Array.from(resolveItems(items, size));
   return static_text_render_once(wasmItems, size?.columns, size?.rows) ?? "";
 }
 
 /** Helper to get the console size and return undefined if it's not available. */
-export function consoleSize(): ConsoleSize | undefined {
+export function maybeConsoleSize(): ConsoleSize | undefined {
   try {
     return Deno.consoleSize();
   } catch {
