@@ -8,7 +8,9 @@ import {
 export type TextItem = string | DeferredItem | DetailedTextItem;
 
 /** Function called on each render. */
-export type DeferredItem = (size: ConsoleSize | undefined) => (TextItem | TextItem[]);
+export type DeferredItem = (
+  size: ConsoleSize | undefined,
+) => TextItem | TextItem[];
 
 /** Item that also supports hanging indentation. */
 export interface DetailedTextItem {
@@ -97,7 +99,7 @@ export class StaticTextScope implements Disposable {
 export class StaticTextContainer {
   readonly #container = new RustyStaticTextContainer();
   private readonly [scopesSymbol]: StaticTextScope[] = [];
-  readonly #getConsoleSize: () => (ConsoleSize | undefined);
+  readonly #getConsoleSize: () => ConsoleSize | undefined;
   readonly #onWriteText: (text: string) => void;
   private readonly [onItemsChangedEventsSymbol]: (() => void)[] = [];
 
@@ -196,7 +198,10 @@ export class StaticTextContainer {
     }
   }
 
-  private [renderOnceSymbol](items: WasmTextItem[], size: ConsoleSize | undefined) {
+  private [renderOnceSymbol](
+    items: WasmTextItem[],
+    size: ConsoleSize | undefined,
+  ) {
     const newText = static_text_render_once(items, size?.columns, size?.rows);
     if (newText != null) {
       this.#onWriteText(newText + "\r\n");
@@ -364,7 +369,7 @@ export const staticText: StaticTextContainer = new StaticTextContainer(
 export const renderInterval: RenderInterval = new RenderInterval(staticText);
 
 /** Renders the text items to a string using no knowledge of a `StaticTextContainer`. */
-export function renderTextItems(items: TextItem[], size?: ConsoleSize) {
+export function renderTextItems(items: TextItem[], size?: ConsoleSize): string {
   size ??= consoleSize();
   const wasmItems = Array.from(resolveItems(items, size));
   return static_text_render_once(wasmItems, size?.columns, size?.rows) ?? "";
