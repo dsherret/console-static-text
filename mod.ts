@@ -4,14 +4,19 @@ import {
   strip_ansi_codes,
 } from "./lib/rs_lib.js";
 
-export type TextItem = string | DeferredText | DetailedTextItem;
+export type TextItem = string | DeferredItem | DetailedTextItem;
 
 /** Text that's rendered at compile time. */
-export type DeferredText = (size: ConsoleSize) => string;
+export type DeferredItem = (size: ConsoleSize) => TextItem | TextItem[];
 
 export interface DetailedTextItem {
-  text: string | DeferredText;
-  indent?: number;
+  text: string | DeferredItem;
+  hangingIndent?: number;
+}
+
+interface WasmTextItem {
+  text: string;
+  hangingIndent?: number;
 }
 
 export interface ConsoleSize {
@@ -48,10 +53,10 @@ export class StaticTextScope implements Disposable {
   /** Sets the text to render for this scope. */
   setText(text: string): void;
   /** Text with a render function. */
-  setText(deferredText: DeferredText): void;
+  setText(deferredText: DeferredItem): void;
   /** Sets the items for this scope. */
   setText(items: TextItem[]): void;
-  setText(textOrItems: TextItem[] | string | DeferredText): void {
+  setText(textOrItems: TextItem[] | string | DeferredItem): void {
     if (typeof textOrItems === "string") {
       textOrItems = [{ text: textOrItems }];
     } else if (textOrItems instanceof Function) {
@@ -115,12 +120,11 @@ export class StaticTextContainer {
   logAbove(textOrItems: TextItem[] | string, size?: ConsoleSize): void;
   logAbove(textOrItems: TextItem[] | string, size?: ConsoleSize) {
     size ??= this.getConsoleSize();
-    let detailedItem: DetailedTextItem[];
+    let detailedItem: WasmTextItem[];
     if (typeof textOrItems === "string") {
       detailedItem = [{ text: textOrItems }];
     } else {
-      // make a copy of the array
-      detailedItem = textOrItems.map((item) => evalItem(item, size));
+      detailedItem = Array.from(resolveItems(textOrItems, size));
     }
     this.withTempClear(() => {
       this[renderOnceSymbol](detailedItem, size);
@@ -170,19 +174,19 @@ export class StaticTextContainer {
    */
   renderRefreshText(size?: ConsoleSize): string | undefined {
     size ??= this.#getConsoleSize();
-    const length = this[scopesSymbol].map((p) => p[getItemsSymbol]().length)
-      .reduce((a, b) => a + b, 0);
-    const items = new Array(length);
-    let i = 0;
-    for (const provider of this[scopesSymbol]) {
-      for (const item of provider[getItemsSymbol]()) {
-        items[i++] = evalItem(item, size);
-      }
-    }
+    const items = Array.from(this.#resolveItems(size));
     return this.#container.render_text(items, size.columns, size.rows);
   }
 
-  private [renderOnceSymbol](items: DetailedTextItem[], size: ConsoleSize) {
+  *#resolveItems(size: ConsoleSize): Iterable<WasmTextItem> {
+    for (const provider of this[scopesSymbol]) {
+      for (const item of provider[getItemsSymbol]()) {
+        yield* resolveItem(item, size);
+      }
+    }
+  }
+
+  private [renderOnceSymbol](items: WasmTextItem[], size: ConsoleSize) {
     const { columns, rows } = size;
     const newText = static_text_render_once(items, columns, rows);
     if (newText != null) {
@@ -351,17 +355,44 @@ export function stripAnsiCodes(text: string): string {
   return strip_ansi_codes(text);
 }
 
-function evalItem(item: TextItem, size: ConsoleSize): DetailedTextItem {
-  if (typeof item === "string") {
-    return { text: item };
-  } else if (item instanceof Function) {
-    return { text: item(size) };
-  } else if (item.text instanceof Function) {
-    return {
-      ...item,
-      text: item.text(size),
-    };
+function* resolveDeferred(
+  deferred: DeferredItem,
+  size: ConsoleSize,
+): Iterable<WasmTextItem> {
+  const value = deferred(size);
+  if (value instanceof Array) {
+    yield* resolveItems(value, size);
   } else {
-    return item;
+    yield* resolveItem(value, size);
+  }
+}
+
+function* resolveItems(
+  value: TextItem[],
+  size: ConsoleSize,
+): Iterable<WasmTextItem> {
+  for (const item of value) {
+    yield* resolveItem(item, size);
+  }
+}
+
+function* resolveItem(
+  item: TextItem,
+  size: ConsoleSize,
+): Iterable<WasmTextItem> {
+  if (typeof item === "string") {
+    yield { text: item };
+  } else if (item instanceof Function) {
+    yield* resolveDeferred(item, size);
+  } else if (item.text instanceof Function) {
+    const hangingIndent = item.hangingIndent ?? 0;
+    for (const value of resolveDeferred(item.text, size)) {
+      yield {
+        ...value,
+        hangingIndent: hangingIndent + (value.hangingIndent ?? 0),
+      };
+    }
+  } else {
+    yield item as WasmTextItem;
   }
 }

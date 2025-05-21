@@ -60,7 +60,7 @@ Deno.test("should set items", () => {
   assertText("~MOVE0~~CLEAR_CDOWN~Hello\r\nthere this\r\nis a test~MOVE0~");
   scope.setText([{
     text: "something else",
-    indent: 1,
+    hangingIndent: 1,
   }]);
   container.refresh();
   assertText(
@@ -81,6 +81,13 @@ Deno.test("should set items", () => {
   newScope[Symbol.dispose]();
   container.refresh();
   assertText("~MOVE0~something\r\n else~MOVE0~");
+
+  scope.setText(() => [
+    "First",
+    () => "Second",
+  ]);
+  newScope.refresh();
+  assertText("~MOVE0~~CUP1~First~CLEAR_UNTIL_NEWLINE~\r\nSecond~MOVE0~");
 });
 
 Deno.test("render interval", async () => {

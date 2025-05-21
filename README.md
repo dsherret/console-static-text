@@ -28,34 +28,19 @@ scope.setText([
   "Some very long text. ".repeat(10),
   () => `Time is: ${new Date()}`,
   (consoleSize) => `Console size: ${consoleSize.rows}, ${consoleSize.columns}`,
+  () => {
+    // or deferred and multiple lines.
+    return [
+      "Line 1",
+      (consoleSize) => (Math.random() * consoleSize.columns!).toString(),
+    ];
+  },
 ]);
-staticText.refresh(); // draw to console window
+staticText.refresh(); // now draw to console window
 
 await delay(1_000);
 scope.logAbove("Hello!"); // this will be logged immediately above the other text
 ```
-
-## Hanging indentation
-
-Hanging indentation is possible by providing `TextItem` objects.
-
-```ts
-import { staticText } from "@david/console-static-text";
-
-using scope = staticText.createScope();
-
-scope.setText([{
-  text: "Some non-hanging text.",
-}, {
-  text: "Some long text that will wrap at a certain width.",
-  indent: 4,
-}]);
-
-staticText.refresh(); // draw to console window
-```
-
-This is useful when implementing something like a selection UI where you want
-text to wrap with hanging indentation.
 
 ## Render interval
 
@@ -88,6 +73,28 @@ await download();
 
 Note this won't render if there's any blocking synchronous work. To do that, you
 must force a refresh via `staticText.refresh()`.
+
+## Hanging indentation
+
+Hanging indentation is possible by providing `TextItem` objects.
+
+```ts
+import { staticText } from "@david/console-static-text";
+
+using scope = staticText.createScope();
+
+scope.setText([{
+  text: "Some non-hanging text.",
+}, {
+  text: "Some long text that will wrap at a certain width.",
+  hangingIndent: 4,
+}]);
+
+staticText.refresh(); // draw to console window
+```
+
+This is useful when implementing something like a selection UI where you want
+text to wrap with hanging indentation.
 
 ## Singleton and instances
 

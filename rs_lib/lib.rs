@@ -10,16 +10,23 @@ use wasm_bindgen::prelude::*;
 #[serde(untagged)]
 pub enum WasmTextItem {
   Text(String),
-  HangingText { text: String, indent: Option<u16> },
+  HangingText {
+    text: String,
+    #[serde(rename = "hangingIndent")]
+    hanging_indent: Option<u16>,
+  },
 }
 
 impl WasmTextItem {
   pub fn as_text_item(&self) -> TextItem {
     match self {
       WasmTextItem::Text(text) => TextItem::Text(Cow::Borrowed(text.as_str())),
-      WasmTextItem::HangingText { text, indent } => TextItem::HangingText {
+      WasmTextItem::HangingText {
+        text,
+        hanging_indent,
+      } => TextItem::HangingText {
         text: Cow::Borrowed(text.as_str()),
-        indent: indent.unwrap_or(0),
+        indent: hanging_indent.unwrap_or(0),
       },
     }
   }
