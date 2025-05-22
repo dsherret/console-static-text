@@ -46,10 +46,12 @@ export class StaticTextScope implements Disposable {
   }
 
   [Symbol.dispose]() {
+    this.#items.length = 0; // clear
     const index = this.#container[scopesSymbol].indexOf(this);
     if (index >= 0) {
       this.#container[scopesSymbol].splice(index, 1);
       this.#container.refresh();
+      this.#notifyContainerOnItemsChanged();
     }
   }
 
@@ -326,7 +328,7 @@ export class RenderInterval implements Disposable {
       const hasItems = this.#containerHasItems();
       if (hasItems != lastValue) {
         lastValue = hasItems;
-        if (this.#containerHasItems()) {
+        if (hasItems) {
           this.#startInterval();
         } else {
           this.#stopInterval();
