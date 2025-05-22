@@ -146,6 +146,33 @@ Deno.test("render interval refreshes on disposal", () => {
   assertText("~MOVE0~~CLEAR_UNTIL_NEWLINE~~MOVE0~");
 });
 
+Deno.test("render interval no using, doesn't leak interval", async () => {
+  let writtenText: string = "";
+  const assertText = (text: string) => {
+    assertEquals(vtsReplace(writtenText), text);
+    writtenText = "";
+  };
+
+  const container = new StaticTextContainer(
+    (text) => {
+      writtenText += text;
+    },
+    () => ({ rows: 10, columns: 10 }),
+  );
+  const interval = new RenderInterval(container);
+  interval.intervalMs = 5;
+  interval.start(); // no dispose
+
+  {
+    using scope = container.createScope();
+    scope.setText("1");
+    await delay(10);
+    assertText("~MOVE0~~CLEAR_CDOWN~1~MOVE0~");
+  }
+
+  // deno should not complain here about leaked intervals
+});
+
 Deno.test("render interval starts and stops", async () => {
   let writtenText: string = "";
   const assertText = (text: string) => {
