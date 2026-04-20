@@ -9,7 +9,8 @@
   ],
   "lint": {
     "rules": {
-      "include": ["no-console"]
+      "include": ["no-console"],
+      "exclude": ["no-process-global"]
     }
   },
   "imports": {
