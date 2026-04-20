@@ -359,11 +359,7 @@ export class RenderInterval implements Disposable {
  */
 export const staticText: StaticTextContainer = new StaticTextContainer(
   (text) => {
-    const bytes = encoder.encode(text);
-    let written = 0;
-    while (written < bytes.length) {
-      written += Deno.stderr.writeSync(bytes.subarray(written));
-    }
+    process.stderr.write(encoder.encode(text));
   },
   () => maybeConsoleSize(),
 );
@@ -380,7 +376,15 @@ export function renderTextItems(items: TextItem[], size?: ConsoleSize): string {
 /** Helper to get the console size and return undefined if it's not available. */
 export function maybeConsoleSize(): ConsoleSize | undefined {
   try {
-    return Deno.consoleSize();
+    for (const stream of [process.stdout, process.stderr]) {
+      if (stream.isTTY) {
+        return {
+          columns: stream.columns,
+          rows: stream.rows,
+        };
+      }
+    }
+    return undefined;
   } catch {
     return undefined;
   }

@@ -18,7 +18,7 @@ pub enum WasmTextItem {
 }
 
 impl WasmTextItem {
-  pub fn as_text_item(&self) -> TextItem {
+  pub fn as_text_item(&self) -> TextItem<'_> {
     match self {
       WasmTextItem::Text(text) => TextItem::Text(Cow::Borrowed(text.as_str())),
       WasmTextItem::HangingText {
