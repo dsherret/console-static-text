@@ -113,6 +113,13 @@ export class StaticTextContainer {
     this.#getConsoleSize = getConsoleSize;
   }
 
+  /** If any scope has text. */
+  hasText() {
+    return this[scopesSymbol].some((s) =>
+      s[getItemsSymbol]().length > 0
+    );
+  }
+
   /** Creates a scope which can be used to set the text for. */
   createScope(): StaticTextScope {
     return new StaticTextScope(this);
@@ -289,15 +296,9 @@ export class RenderInterval implements Disposable {
     };
   }
 
-  #containerHasItems() {
-    return this.#container[scopesSymbol].some((s) =>
-      s[getItemsSymbol]().length > 0
-    );
-  }
-
   #markStart() {
     this.#addSubscriptionToContainer();
-    if (this.#containerHasItems()) {
+    if (this.#container.hasText()) {
       this.#container.refresh();
     }
   }
@@ -323,9 +324,9 @@ export class RenderInterval implements Disposable {
   }
 
   #addSubscriptionToContainer() {
-    let lastValue = this.#containerHasItems();
+    let lastValue = this.#container.hasText();
     this.#containerSubscription = () => {
-      const hasItems = this.#containerHasItems();
+      const hasItems = this.#container.hasText();
       if (hasItems != lastValue) {
         lastValue = hasItems;
         if (hasItems) {
