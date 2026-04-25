@@ -196,8 +196,51 @@ Deno.test("render interval starts and stops", async () => {
   scope.setText("New");
   assertText("");
   scope.setText("");
-  scope.setText("New"); // this will cause an immediate render because it was previously cleared
-  assertText("~MOVE0~New~CLEAR_UNTIL_NEWLINE~~MOVE0~");
+  // transitioning to no-items flushes clearance ANSI before the
+  // interval stops, so the previously drawn pinned region is cleared
+  // off screen rather than lingering as stale scrollback.
+  assertText("~MOVE0~~CLEAR_UNTIL_NEWLINE~~MOVE0~");
+  scope.setText("New"); // immediate render because interval restarts
+  assertText("~MOVE0~New~MOVE0~");
+});
+
+Deno.test("render interval clears pinned region on transition to empty", async () => {
+  let writtenText: string = "";
+  const assertText = (text: string) => {
+    assertEquals(vtsReplace(writtenText), text);
+    writtenText = "";
+  };
+
+  const container = new StaticTextContainer(
+    (text) => {
+      writtenText += text;
+    },
+    () => ({ rows: 20, columns: 20 }),
+  );
+  using renderInterval = new RenderInterval(container);
+  renderInterval.intervalMs = 10;
+  using _renderScope = renderInterval.start();
+  using scope = container.createScope();
+
+  // draw once
+  scope.setText("pinned");
+  await delay(15);
+  assertText("~MOVE0~~CLEAR_CDOWN~pinned~MOVE0~");
+
+  // transition to empty: clearance should fire synchronously from the
+  // setText call (via the subscription), not deferred to a later tick.
+  scope.setText("");
+  assertText("~MOVE0~~CLEAR_UNTIL_NEWLINE~~MOVE0~");
+
+  // no further writes happen even after waiting past several tick intervals —
+  // the interval was stopped when items went empty, so it's not redrawing.
+  await delay(30);
+  assertText("");
+
+  // items come back: interval restarts and emits the new render. no stray
+  // duplicate clearance or other artifacts from the earlier transition.
+  scope.setText("back");
+  assertText("~MOVE0~back~MOVE0~");
 });
 
 Deno.test("deferred rendering", () => {
