@@ -114,10 +114,8 @@ export class StaticTextContainer {
   }
 
   /** If any scope has text or items. */
-  hasText() {
-    return this[scopesSymbol].some((s) =>
-      s[getItemsSymbol]().length > 0
-    );
+  hasText(): boolean {
+    return this[scopesSymbol].some((s) => s[getItemsSymbol]().length > 0);
   }
 
   /** Creates a scope which can be used to set the text for. */
