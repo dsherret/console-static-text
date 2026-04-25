@@ -1,5 +1,5 @@
 import { RenderInterval, StaticTextContainer } from "./mod.ts";
-import { assertEquals } from "@std/assert";
+import { assertEquals, assertStringIncludes } from "@std/assert";
 import { delay } from "@std/async/delay";
 
 function createVtsReplacements() {
@@ -88,6 +88,31 @@ Deno.test("should set items", () => {
   ]);
   newScope.refresh();
   assertText("~MOVE0~~CUP1~First~CLEAR_UNTIL_NEWLINE~\r\nSecond~MOVE0~");
+});
+
+Deno.test("logAbove does not clip items to fit console height", () => {
+  let writtenText: string = "";
+
+  // console is only 3 rows tall. if logAbove were clipped to fit the pinned
+  // region's row budget, most of these 10 items would be dropped from the
+  // top. logAbove writes to scrollback (which is unbounded), so every item
+  // must be emitted regardless of console height.
+  const container = new StaticTextContainer(
+    (text) => {
+      writtenText += text;
+    },
+    () => ({ rows: 3, columns: 40 }),
+  );
+  using scope = container.createScope();
+  scope.setText("pinned");
+  container.refresh();
+  writtenText = "";
+
+  const items = Array.from({ length: 10 }, (_, i) => `line ${i}`);
+  scope.logAbove(items);
+  for (let i = 0; i < 10; i++) {
+    assertStringIncludes(writtenText, `line ${i}`);
+  }
 });
 
 Deno.test("render interval basic", async () => {
