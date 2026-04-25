@@ -209,7 +209,11 @@ export class StaticTextContainer {
     items: WasmTextItem[],
     size: ConsoleSize | undefined,
   ) {
-    const newText = static_text_render_once(items, size?.columns, size?.rows);
+    // logAbove content goes to scrollback (which is unbounded), so render
+    // with no row limit — otherwise the underlying renderer would clip
+    // items from the top to fit `size.rows` and drop content the caller
+    // expects to be preserved. Column width still matters for wrapping.
+    const newText = static_text_render_once(items, size?.columns, undefined);
     if (newText != null) {
       this.#onWriteText(newText + "\r\n");
     }
