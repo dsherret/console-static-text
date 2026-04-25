@@ -196,8 +196,12 @@ Deno.test("render interval starts and stops", async () => {
   scope.setText("New");
   assertText("");
   scope.setText("");
-  scope.setText("New"); // this will cause an immediate render because it was previously cleared
-  assertText("~MOVE0~New~CLEAR_UNTIL_NEWLINE~~MOVE0~");
+  // transitioning to no-items flushes clearance ANSI before the
+  // interval stops, so the previously drawn pinned region is cleared
+  // off screen rather than lingering as stale scrollback.
+  assertText("~MOVE0~~CLEAR_UNTIL_NEWLINE~~MOVE0~");
+  scope.setText("New"); // immediate render because interval restarts
+  assertText("~MOVE0~New~MOVE0~");
 });
 
 Deno.test("deferred rendering", () => {

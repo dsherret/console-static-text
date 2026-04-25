@@ -331,6 +331,7 @@ export class RenderInterval implements Disposable {
           this.#startInterval();
         } else {
           this.#stopInterval();
+          this.#container.refresh();
         }
       }
     };
