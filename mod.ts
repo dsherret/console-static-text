@@ -113,7 +113,7 @@ export class StaticTextContainer {
     this.#getConsoleSize = getConsoleSize;
   }
 
-  /** If any scope has text. */
+  /** If any scope has text or items. */
   hasText() {
     return this[scopesSymbol].some((s) =>
       s[getItemsSymbol]().length > 0
