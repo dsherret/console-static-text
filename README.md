@@ -1,6 +1,7 @@
-# `jsr:@david/console-static-text`
+# `console-static-text`
 
 [![JSR](https://jsr.io/badges/@david/console-static-text)](https://jsr.io/@david/console-static-text)
+[![npm](https://img.shields.io/npm/v/console-static-text)](https://www.npmjs.com/package/console-static-text)
 
 For the Rust crate, go to
 [console_static_text](https://github.com/dsherret/console_static_text).
@@ -8,7 +9,11 @@ For the Rust crate, go to
 Install:
 
 ```sh
+# jsr
 deno add jsr:@david/console-static-text
+
+# npm
+npm install console-static-text
 ```
 
 Library for displaying text that should stay at the bottom of the console. This
