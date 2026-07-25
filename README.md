@@ -9,10 +9,10 @@ For the Rust crate, go to
 Install:
 
 ```sh
-# Deno
+# jsr
 deno add jsr:@david/console-static-text
 
-# Node
+# npm
 npm install console-static-text
 ```
 

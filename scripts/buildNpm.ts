@@ -7,7 +7,6 @@ await emptyDir("./npm");
 await build({
   entryPoints: ["./mod.ts"],
   outDir: "./npm",
-  // the source is already written against node apis
   shims: {
     deno: {
       test: "dev",
@@ -19,6 +18,8 @@ await build({
     lib: ["ESNext"],
     target: "ES2022",
   },
+  scriptModule: false,
+  declarationMap: false,
   package: {
     name: "console-static-text",
     // only used for publishing, so a placeholder is fine for local builds
@@ -52,6 +53,9 @@ await build({
       readme.replaceAll(
         'src="videos/',
         'src="https://raw.githubusercontent.com/dsherret/console-static-text/main/videos/',
+      ).replaceAll(
+        '"@david/console-static-text"',
+        '"console-static-text"',
       ),
     );
   },
